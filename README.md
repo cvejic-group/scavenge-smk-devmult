@@ -1,0 +1,79 @@
+# scavenge-smk
+This is a Snakemake pipeline for running SCAVENGE on large scATAC-seq datasets.
+Specifically, the pipeline is written for an `SummarizedExperiment` object
+that represents peak-cell counts.
+
+## Overview
+
+The pipeline uses the arguments in `config/config.yaml` to compute chromVAR deviations and 
+SCAVENGE TRS scores using peak-cell counts input as an `HDF5Array`-backed `SummarizedExperiment` object.
+The pipeline includes both a **subsampling** mode and a **full** mode. The Snakefile `MAIN` section 
+defines what outputs will be generated.
+
+### Inputs
+- `se_peak_cell` - a peak-cell count `SummarizedExperiment` object
+- BED files for fine-mapped traits
+
+### Outputs
+- `results/trs/` - CSV tables per trait and per trait set with chromVAR and SCAVENGE scores
+- `results/reports/` - summarizations per trait and per trait set
+
+## Running the Pipeline
+The pipeline has been previously run with Snakemake v8.15 in both local and SLURM-based modes.
+It is expected to run with Conda+Mamba (Miniforge installation).
+
+### Install Snakemake from YAML
+YAML representations of the Conda environment with Snakemake v8.15 are provided in minimal (".min") 
+and full (".full") forms for reuse and reproduction, respectively. The minimal environment could be
+created with
+
+```bash
+conda env create -n smk_8_15 -f workflow/envs/smk_8_15.min.yaml
+```
+
+### Local Execution
+The pipeline can be executed locally with
+
+```bash
+snakemake --use-conda --cores 64 -s workflow/Snakefile
+```
+
+Adjust the `--cores` argument accordingly.
+
+### SLURM Execution
+To run on a SLURM configuration, first configure a SLURM profile for Snakemake.
+We have used
+
+**~/.config/snakemake/slurm_basic/config.v8+.yaml**
+```yaml
+executor: slurm
+use-conda: true
+jobs: 10000
+default-resources:
+  mem_mb_per_cpu: 4096
+```
+
+which can be used with:
+
+```bash
+snakemake --profile slurm_basic -s workflow/Snakefile
+```
+
+### Generating Individual Outputs
+As a Snakemake pipeline, one can generate individual files *ad hoc* by specifying them in the command.
+For example, one could request a specific report on trait, like `covid19` with
+
+```bash
+snakemake --profile slurm_basic \
+  -s workflow/Snakefile \
+  results/reports/trs/scavenge_yu_2022/report_trs_covid19_knn30_bg200_sample300_rng20241104.html
+```
+
+Note that the parameters in file name must match those in the `config.yaml` or be overridden, e.g.,
+
+```bash
+snakemake --profile slurm_basic \
+  -s workflow/Snakefile \
+  --config seed_rng=20250101 \
+  results/reports/trs/scavenge_yu_2022/report_trs_covid19_knn30_bg200_sample300_rng20250101.html
+```
