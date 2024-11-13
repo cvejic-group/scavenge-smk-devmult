@@ -1,0 +1,481 @@
+---
+author: "Mervin M Fansler"
+date: "`r format(Sys.time(), '%d %B %Y')`"
+output: 
+  html_document: 
+    code_folding: show
+    df_print: paged
+    theme: cosmo
+    toc: true
+    toc_float: true
+---
+
+
+```{r snakemake_object, include=FALSE, eval=FALSE}
+if (interactive()) { ## fake data for testing
+  Snakemake <- setClass("Snakemake", slots=c(input="list", output="list",
+                                             params="list", threads="numeric"))
+  snakemake <- Snakemake(
+    input=list(se="results/se/subsamples/se_sample300_rng20241104.Rds",
+               csv_trait="results/trs/scavenge_yu_2022/df_trs_covid19_knn30_bg200_sample300_rng20241104.csv.gz"),
+    output=list("results/reports/trs/scavenge_yu_2022/df_trs_covid19_knn30_bg200_sample300_rng20241104.html"),
+    params=list(n_subsample="300",
+                rseed="20241104",
+                trait_set_id="scavenge_yu_2022",
+                trait_id="covid19"),
+    threads=4L)
+}
+
+print(snakemake)
+```
+
+
+```{r echo=FALSE}
+title_str <- sprintf("SCAVENGE %s - Subsampled", snakemake@params$trait_id)
+```
+
+---
+title: `r title_str`
+---
+
+# Purpose
+
+Here we explore the SCAVENGE results for the trait **`r snakemake@params$trait_id`** in trait set 
+**`r snakemake@params$trait_set_id`** run on a random (seed: **`r snakemake@params$rseed`**) subset of 
+`r snakemake@params$n_subsample` cells per sample.
+
+# Initialization
+
+## Libraries
+```{r libs, message=FALSE, warning=FALSE}
+library(SummarizedExperiment)
+library(tidyverse)
+library(magrittr)
+```
+
+## Parameters
+```{r set_params}
+set.seed(snakemake@params$seed)
+
+theme_set(theme_bw())
+```
+
+# Data
+## Loading
+```{r load_data, message=FALSE}
+se_peak_cell <- readRDS(snakemake@input$se)
+
+df_trait <- read_csv(snakemake@input$csv_trait, show_col_types=FALSE)
+```
+
+## Merge Data
+```{r merge_data}
+mat_umap <- metadata(se_peak_cell)$reducedDims$UMAP[df_trait$cell_id,] %>% `colnames<-`(c("UMAP1", "UMAP2"))
+mat_lsi <- metadata(se_peak_cell)$reducedDims$LSI[df_trait$cell_id,]
+
+df_trait <- colData(se_peak_cell[,df_trait$cell_id]) %>%
+  as_tibble(rownames="cell_id") %>%
+  left_join(x=df_trait, by="cell_id") %>%
+  bind_cols(mat_umap) %>% bind_cols(mat_lsi) %>%
+  mutate(is_omitted=is.na(trs_raw))
+```
+
+
+# Cell Types
+## UMAP
+```{r umap_celltype, fig.width=12, fig.height=8}
+df_trait %>%
+  ggplot(aes(UMAP1, UMAP2, color=celltype)) +
+  geom_point(size=0.3, alpha=0.3, na.rm=TRUE) +
+  scale_color_discrete(guide=guide_legend(override.aes=list(size=3, alpha=1))) +
+  labs(x="UMAP 1", y="UMAP 2", color=NULL)
+```
+
+## LSI
+```{r lsi_celltype, fig.width=12, fig.height=8}
+df_trait %>%
+  ggplot(aes(LSI1, LSI2, color=celltype)) +
+  geom_point(size=0.3, alpha=0.3, na.rm=TRUE) +
+  scale_color_discrete(guide=guide_legend(override.aes=list(size=3, alpha=1))) +
+  labs(x="LSI 1", y="LSI 2", color=NULL)
+
+df_trait %>%
+  ggplot(aes(LSI3, LSI4, color=celltype)) +
+  geom_point(size=0.3, alpha=0.3, na.rm=TRUE) +
+  scale_color_discrete(guide=guide_legend(override.aes=list(size=3, alpha=1))) +
+  labs(x="LSI 3", y="LSI 4", color=NULL)
+```
+
+# Omission Checking
+#### Cell Type
+```{r max_ct}
+max_omit_celltype <- df_trait %>%
+  group_by(celltype) %>%
+  summarize(frac_omitted=mean(is_omitted)) %>%
+  pull(frac_omitted) %>%
+  max
+
+ceil_omit_celltype <- ceiling(100*max_omit_celltype)
+```
+
+No more than `r ceil_omit_celltype`% of any cell type is omitted.
+```{r fig.width=6, fig.height=4}
+df_trait %>%
+  ggplot(aes(x=celltype, fill=is_omitted)) +
+  geom_bar(position='fill') +
+  scale_fill_manual(values=c("grey90", "red3")) +
+  scale_x_discrete(guide=guide_axis(angle=90)) +
+  scale_y_continuous(expand=c(0,0)) +
+  labs(x=NULL, y="Fraction of Cells", fill="Omitted")
+
+df_trait %>%
+  ggplot(aes(x=celltype, fill=is_omitted)) +
+  geom_bar(position='fill') +
+  scale_fill_manual(values=c("grey90", "red3")) +
+  scale_x_discrete(guide=guide_axis(angle=90)) +
+  scale_y_continuous(expand=c(0,0)) +
+  coord_cartesian(ylim=c(0, ceil_omit_celltype/100)) +
+  labs(x=NULL, y="Fraction of Cells", fill="Omitted")
+```
+
+#### PCW
+```{r max_pcw}
+max_omit_pcw <- df_trait %>%
+  group_by(PCW) %>%
+  summarize(frac_omitted=mean(is_omitted)) %>%
+  pull(frac_omitted) %>%
+  max
+
+ceil_omit_pcw <- ceiling(100*max_omit_pcw)
+```
+
+No more than `r ceil_omit_pcw`% of any developmental age is omitted.
+```{r fig.width=5, fig.height=4}
+df_trait %>%
+  ggplot(aes(x=factor(PCW), fill=is_omitted)) +
+  geom_bar(position='fill') +
+  scale_fill_manual(values=c("grey90", "red3")) +
+  scale_y_continuous(expand=c(0,0)) +
+  labs(x="PCW", y="Fraction of Cells", fill="Omitted")
+
+df_trait %>%
+  ggplot(aes(x=factor(PCW), fill=is_omitted)) +
+  geom_bar(position='fill') +
+  scale_fill_manual(values=c("grey90", "red3")) +
+  scale_y_continuous(expand=c(0,0)) +
+  coord_cartesian(ylim=c(0,ceil_omit_pcw/100)) +
+  labs(x="PCW", y="Fraction of Cells", fill="Omitted")
+```
+
+#### Sample
+```{r max_sample}
+max_omit_sample <- df_trait %>%
+  group_by(sampleID) %>%
+  summarize(frac_omitted=mean(is_omitted)) %>%
+  pull(frac_omitted) %>%
+  max
+
+ceil_omit_sample <- ceiling(100*max_omit_sample)
+```
+
+No more than `r ceil_omit_sample`% of any sample is omitted.
+```{r fig.width=10, fig.height=4}
+df_trait %>%
+  ggplot(aes(x=sampleID, fill=is_omitted)) +
+  geom_bar(position='fill') +
+  scale_fill_manual(values=c("grey90", "red3")) +
+  scale_x_discrete(guide=guide_axis(angle=90)) +
+  scale_y_continuous(expand=c(0,0)) +
+  labs(x="Sample", y="Fraction of Cells", fill="Omitted")
+
+df_trait %>%
+  ggplot(aes(x=sampleID, fill=is_omitted)) +
+  geom_bar(position='fill') +
+  scale_fill_manual(values=c("grey90", "red3")) +
+  scale_x_discrete(guide=guide_axis(angle=90)) +
+  scale_y_continuous(expand=c(0,0)) +
+  coord_cartesian(ylim=c(0,ceil_omit_sample/100)) +
+  labs(x="Sample", y="Fraction of Cells", fill="Omitted")
+```
+
+#### UMAP
+```{r plt_sample_umap_omitted, fig.width=8, fig.height=6}
+df_trait %>%
+  arrange(is_omitted) %>%
+  ggplot(aes(x=UMAP1, y=UMAP2, color=is_omitted)) +
+  geom_point(aes(size= is_omitted, alpha=is_omitted)) +
+  scale_color_manual(values=c('grey90', 'red3'), guide=guide_legend(override.aes=list(size=3, alpha=1))) +
+  scale_alpha_manual(values=c(0.3, 1), guide='none') + scale_size_manual(values=c(0.3, 1), guide='none') +
+  labs(x="UMAP 1", y="UMAP 2", color="Omitted")
+```
+#### LSI
+```{r plt_sample_lsi_omitted, fig.width=8, fig.height=6}
+df_trait %>%
+  arrange(is_omitted) %>%
+  ggplot(aes(x=LSI1, y=LSI2, color=is_omitted)) +
+  geom_point(aes(size= is_omitted, alpha=is_omitted)) +
+  scale_color_manual(values=c('grey90', 'red3'), guide=guide_legend(override.aes=list(size=3, alpha=1))) +
+  scale_alpha_manual(values=c(0.3, 1), guide='none') + scale_size_manual(values=c(0.3, 1), guide='none') +
+  labs(x="LSI 1", y="LSI 2", color="Omitted")
+
+df_trait %>%
+  arrange(is_omitted) %>%
+  ggplot(aes(x=LSI3, y=LSI4, color=is_omitted)) +
+  geom_point(aes(size= is_omitted, alpha=is_omitted)) +
+  scale_color_manual(values=c('grey90', 'red3'), guide=guide_legend(override.aes=list(size=3, alpha=1))) +
+  scale_alpha_manual(values=c(0.3, 1), guide='none') + scale_size_manual(values=c(0.3, 1), guide='none') +
+  labs(x="LSI 3", y="LSI 4", color="Omitted")
+```
+
+
+# chromVAR
+## Z-Scores
+### UMAP
+```{r umap_zscore, fig.width=10, fig.height=8}
+df_trait %>%
+  arrange(abs(z_score)) %>%
+  ggplot(aes(UMAP1, UMAP2, color=z_score)) +
+  geom_point(aes(size=abs(z_score)), alpha=0.8, na.rm=TRUE) +
+  scale_color_viridis_c(option="B") +
+  scale_size_continuous(range=c(0.01, 3), guide='none') +
+  labs(x="UMAP 1", y="UMAP 2", color='Z-score')
+```
+
+### Violin
+```{r plt_zscore_violin, fig.width=8, fig.height=6}
+df_trait %>%
+  mutate(celltype_fct=reorder(celltype, -z_score, FUN=median)) %>%
+  ggplot(aes(x=celltype_fct, y=z_score, fill=celltype)) +
+  geom_violin(draw_quantiles=c(0.25,0.5,0.75), scale='width', alpha=0.6) +
+  scale_fill_discrete(guide=guide_none()) +
+  scale_x_discrete(guide=guide_axis(angle=90)) + 
+  labs(x=NULL, y="Z-score")
+```
+
+### Boxplot
+```{r plt_zscore_box, fig.width=8, fig.height=6}
+df_trait %>%
+  mutate(celltype_fct=reorder(celltype, -z_score, FUN=median)) %>%
+  ggplot(aes(x=celltype_fct, y=z_score, fill=celltype)) +
+  geom_boxplot(alpha=0.6) +
+  scale_fill_discrete(guide=guide_none()) +
+  scale_x_discrete(guide=guide_axis(angle=90)) + 
+  labs(x=NULL, y="Z-score")
+
+df_trait %>%
+  mutate(celltype_fct=reorder(celltype, -z_score, FUN=median)) %>%
+  ggplot(aes(x=celltype_fct, y=z_score, fill=celltype)) +
+  geom_boxplot(alpha=0.6, outliers=FALSE) +
+  scale_fill_discrete(guide=guide_none()) +
+  scale_x_discrete(guide=guide_axis(angle=90)) + 
+  labs(x=NULL, y="Z-score")
+```
+
+# SCAVENGE TRS
+## Raw
+### UMAP
+```{r umap_trs_raw, fig.width=10, fig.height=8}
+df_trait %>%
+  arrange(trs_raw) %>%
+  ggplot(aes(UMAP1, UMAP2, color=trs_raw)) +
+  geom_point(aes(size=trs_raw), alpha=0.5, na.rm=TRUE) +
+  scale_color_viridis_c(option="B") +
+  scale_size_continuous(range=c(0.2, 1.5), guide='none') +
+  labs(x="UMAP 1", y="UMAP 2", color='TRS (raw)')
+```
+
+### LSI
+```{r lsi_trs_raw, fig.width=10, fig.height=8}
+df_trait %>%
+  arrange(trs_raw) %>%
+  ggplot(aes(LSI1, LSI2, color=trs_raw)) +
+  geom_point(aes(size=trs_raw), alpha=0.5, na.rm=TRUE) +
+  scale_color_viridis_c(option="B") +
+  scale_size_continuous(range=c(0.2, 1.5), guide='none') +
+  labs(x="LSI 1", y="LSI 2", color='TRS (raw)')
+
+df_trait %>%
+  arrange(trs_raw) %>%
+  ggplot(aes(LSI3, LSI4, color=trs_raw)) +
+  geom_point(aes(size=trs_raw), alpha=0.5, na.rm=TRUE) +
+  scale_color_viridis_c(option="B") +
+  scale_size_continuous(range=c(0.2, 1.5), guide='none') +
+  labs(x="LSI 3", y="LSI 4", color='TRS (raw)')
+```
+
+### Violin
+```{r plt_trs_raw_violin, fig.width=8, fig.height=6}
+df_trait %>%
+  filter(!is_omitted) %>%
+  mutate(celltype_fct=reorder(celltype, -trs_raw, FUN=median)) %>%
+  ggplot(aes(x=celltype_fct, y=trs_raw, fill=celltype)) +
+  geom_violin(draw_quantiles=c(0.25,0.5,0.75), scale='width', alpha=0.6) +
+  scale_fill_discrete(guide=guide_none()) +
+  scale_x_discrete(guide=guide_axis(angle=90)) + 
+  labs(x=NULL, y="TRS (raw)")
+```
+
+### Boxplot
+```{r plt_trs_raw_box, fig.width=8, fig.height=6}
+df_trait %>%
+  filter(!is_omitted) %>%
+  mutate(celltype_fct=reorder(celltype, -trs_raw, FUN=median)) %>%
+  ggplot(aes(x=celltype_fct, y=trs_raw, fill=celltype)) +
+  geom_boxplot(alpha=0.6) +
+  scale_fill_discrete(guide=guide_none()) +
+  scale_x_discrete(guide=guide_axis(angle=90)) + 
+  labs(x=NULL, y="TRS (raw)")
+```
+
+
+## Scaled
+### UMAP
+```{r umap_trs_scale, fig.width=10, fig.height=8}
+df_trait %>%
+  arrange(trs_scaled) %>%
+  ggplot(aes(UMAP1, UMAP2, color=trs_scaled)) +
+  geom_point(aes(size=trs_scaled), alpha=0.5, na.rm=TRUE) +
+  scale_color_viridis_c(option="B") +
+  scale_size_continuous(range=c(0.2, 1.5), guide='none') +
+  labs(x="UMAP 1", y="UMAP 2", color='TRS (scaled)')
+```
+
+### LSI
+```{r lsi_trs_scaled, fig.width=10, fig.height=8}
+df_trait %>%
+  arrange(trs_scaled) %>%
+  ggplot(aes(LSI1, LSI2, color=trs_scaled)) +
+  geom_point(aes(size=trs_scaled), alpha=0.5, na.rm=TRUE) +
+  scale_color_viridis_c(option="B") +
+  scale_size_continuous(range=c(0.2, 1.5), guide='none') +
+  labs(x="LSI 1", y="LSI 2", color='TRS (scaled)')
+
+df_trait %>%
+  arrange(trs_scaled) %>%
+  ggplot(aes(LSI3, LSI4, color=trs_scaled)) +
+  geom_point(aes(size=trs_scaled), alpha=0.5, na.rm=TRUE) +
+  scale_color_viridis_c(option="B") +
+  scale_size_continuous(range=c(0.2, 1.5), guide='none') +
+  labs(x="LSI 3", y="LSI 4", color='TRS (scaled)')
+```
+
+### Violin
+```{r plt_trs_scaled_violin, fig.width=8, fig.height=6}
+df_trait %>%
+  filter(!is_omitted) %>%
+  mutate(celltype_fct=reorder(celltype, -trs_scaled, FUN=median)) %>%
+  ggplot(aes(x=celltype_fct, y=trs_scaled, fill=celltype)) +
+  geom_violin(draw_quantiles=c(0.25,0.5,0.75), scale='width', alpha=0.6) +
+  scale_fill_discrete(guide=guide_none()) +
+  scale_x_discrete(guide=guide_axis(angle=90)) + 
+  labs(x=NULL, y="TRS (scaled)")
+```
+
+### Boxplot
+```{r plt_trs_scaled_box, fig.width=8, fig.height=6}
+df_trait %>%
+  filter(!is_omitted) %>%
+  mutate(celltype_fct=reorder(celltype, -trs_scaled, FUN=median)) %>%
+  ggplot(aes(x=celltype_fct, y=trs_scaled, fill=celltype)) +
+  geom_boxplot(alpha=0.6) +
+  scale_fill_discrete(guide=guide_none()) +
+  scale_x_discrete(guide=guide_axis(angle=90)) + 
+  labs(x=NULL, y="TRS (scaled)")
+```
+
+# Significantly Enriched Cells
+### UMAP
+```{r plt_umap_enriched, fig.width=8, fig.height=6}
+df_trait %>%
+  filter(!is_omitted) %>%
+  arrange(is_enriched) %>%
+  ggplot(aes(x=UMAP1, y=UMAP2, color=is_enriched)) +
+  geom_point(aes(size= is_omitted, alpha=is_omitted)) +
+  scale_color_manual(values=c('grey90', 'steelblue2'), guide=guide_legend(override.aes=list(size=3, alpha=1))) +
+  scale_alpha_manual(values=c(0.3, 1), guide='none') + scale_size_manual(values=c(0.3, 1), guide='none') +
+  labs(x="UMAP 1", y="UMAP 2", color="Trait Enriched")
+```
+
+### LSI
+```{r plt_lsi_enriched, fig.width=8, fig.height=6}
+df_trait %>%
+  filter(!is_omitted) %>%
+  arrange(is_enriched) %>%
+  ggplot(aes(x=LSI1, y=LSI2, color=is_enriched)) +
+  geom_point(aes(size= is_omitted, alpha=is_omitted)) +
+  scale_color_manual(values=c('grey90', 'steelblue2'), guide=guide_legend(override.aes=list(size=3, alpha=1))) +
+  scale_alpha_manual(values=c(0.3, 1), guide='none') + scale_size_manual(values=c(0.3, 1), guide='none') +
+  labs(x="LSI 1", y="LSI 2", color="Trait Enriched")
+
+df_trait %>%
+  filter(!is_omitted) %>%
+  arrange(is_enriched) %>%
+  ggplot(aes(x=LSI3, y=LSI4, color=is_enriched)) +
+  geom_point(aes(size= is_omitted, alpha=is_omitted)) +
+  scale_color_manual(values=c('grey90', 'steelblue2'), guide=guide_legend(override.aes=list(size=3, alpha=1))) +
+  scale_alpha_manual(values=c(0.3, 1), guide='none') + scale_size_manual(values=c(0.3, 1), guide='none') +
+  labs(x="LSI 3", y="LSI 4", color="Trait Enriched")
+```
+
+### Barplot
+#### Number of Cells
+```{r plt_n_sig, fig.width=7, fig.height=4}
+df_trait %>%
+  filter(!is_omitted) %>%
+  mutate(celltype_fct=reorder(celltype, -trs_scaled, FUN=median)) %>%
+  ggplot(aes(x=celltype_fct, fill=is_enriched)) +
+  geom_bar(color='black', linewidth=0.3) +
+  scale_fill_manual(values=c("grey80", "steelblue2")) +
+  scale_x_discrete(guide=guide_axis(angle=90)) + 
+  scale_y_continuous(expand=c(0,0,0.1,0)) + 
+  labs(x=NULL, y="Cells", fill="Trait\nEnriched")
+```
+
+#### Fraction of Cells
+```{r plt_frac_sig, fig.width=7, fig.height=4}
+df_trait %>%
+  filter(!is_omitted) %>%
+  mutate(celltype_fct=reorder(celltype, -trs_scaled, FUN=median)) %>%
+  ggplot(aes(x=celltype_fct, fill=is_enriched)) +
+  geom_bar(position='fill', color='black', linewidth=0.3) +
+  scale_fill_manual(values=c("grey80", "steelblue2")) +
+  scale_x_discrete(guide=guide_axis(angle=90)) + 
+  scale_y_continuous(expand=c(0,0)) + 
+  labs(x=NULL, y="Fraction of Cells", fill="Trait\nEnriched")
+```
+
+
+
+---
+
+# Runtime Details
+## Snakemake Object
+<details>
+```{r print_snakemake, echo=FALSE}
+snakemake
+```
+</details>
+
+## Session Info
+<details>
+```{r sesh_info, echo=FALSE}
+sessionInfo()
+```
+</details>
+
+## Conda Environment
+<details>
+```{bash conda_info, comment="", echo=FALSE}
+if ! command -v conda &> /dev/null
+then
+  echo "Conda not detected."
+elif [ -z "${CONDA_PREFIX}" ]
+then
+  echo "No active Conda environment."
+else
+  echo "## Conda Environment YAML"
+  PREFIX=$(dirname $(dirname $(which R)))
+  conda env export -p $PREFIX
+fi
+```
+</details>

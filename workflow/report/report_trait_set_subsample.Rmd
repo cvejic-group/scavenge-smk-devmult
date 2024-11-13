@@ -1,0 +1,264 @@
+---
+author: "Mervin M Fansler"
+date: "`r format(Sys.time(), '%d %B %Y')`"
+output: 
+  html_document: 
+    code_folding: show
+    df_print: paged
+    theme: cosmo
+    toc: true
+    toc_float: true
+---
+
+
+```{r snakemake_object, include=FALSE, eval=FALSE}
+if (interactive()) { ## fake data for testing
+  Snakemake <- setClass("Snakemake", slots=c(input="list", output="list",
+                                             params="list", threads="numeric"))
+  snakemake <- Snakemake(
+    input=list(se="results/se/subsamples/se_sample300_rng20241104.Rds",
+               csv_trait_set="results/trs/df_trs_scavenge_yu_2022_knn30_bg200_sample300_rng20241104.csv.gz"),
+    output=list("results/reports/trs/report_scavenge_yu_2022_knn30_bg200_sample300_rng20241104.html"),
+    params=list(n_subsample="300",
+                rseed="20241104",
+                trait_set_id="scavenge_yu_2022"),
+    threads=4L)
+}
+
+print(snakemake)
+```
+
+
+```{r echo=FALSE}
+title_str <- sprintf("SCAVENGE %s - Subsampled", snakemake@params$trait_set_id)
+```
+
+---
+title: `r title_str`
+---
+
+# Purpose
+
+Here we explore the SCAVENGE results for the trait set 
+**`r snakemake@params$trait_set_id`** run on a random (seed: **`r snakemake@params$rseed`**) subset of 
+`r snakemake@params$n_subsample` cells per sample.
+
+# Initialization
+
+## Libraries
+```{r libs, message=FALSE, warning=FALSE}
+library(SummarizedExperiment)
+library(tidyverse)
+library(magrittr)
+library(pheatmap)
+```
+
+## Parameters
+```{r set_params}
+set.seed(snakemake@params$seed)
+
+theme_set(theme_bw())
+```
+
+# Data
+## Loading
+```{r load_data, message=FALSE}
+se_peak_cell <- readRDS(snakemake@input$se)
+
+df_trait <- read_csv(snakemake@input$csv_trait_set, show_col_types=FALSE)
+```
+
+## Merge Data
+```{r merge_data}
+df_umap <- metadata(se_peak_cell)$reducedDims$UMAP[unique(df_trait$cell_id),] %>% 
+  `colnames<-`(c("UMAP1", "UMAP2")) %>%
+  as_tibble(rownames="cell_id")
+df_lsi <- metadata(se_peak_cell)$reducedDims$LSI[unique(df_trait$cell_id),] %>%
+  as_tibble(rownames="cell_id")
+
+df_trait <- colData(se_peak_cell[,unique(df_trait$cell_id)]) %>%
+  as_tibble(rownames="cell_id") %>%
+  left_join(x=df_trait, by="cell_id") %>%
+  left_join(df_umap, by="cell_id") %>% 
+  left_join(df_lsi, by="cell_id") %>%
+  mutate(is_omitted=is.na(trs_raw))
+```
+
+
+# chromVAR
+## Z-Scores
+```{r summarize_zscores}
+df_z <- df_trait %>%
+  group_by(celltype, trait_id) %>%
+  summarise(mean_z_score=mean(z_score, na.rm=TRUE),
+            median_z_score=median(z_score, na.rm=TRUE),
+            .groups='drop')
+
+mat_mean_z <- df_z %>%
+  dplyr::select(celltype, trait_id, mean_z_score) %>%
+  pivot_wider(names_from="celltype", values_from="mean_z_score") %>%
+  column_to_rownames("trait_id") %>%
+  as.matrix
+
+mat_median_z <- df_z %>%
+  dplyr::select(celltype, trait_id, median_z_score) %>%
+  pivot_wider(names_from="celltype", values_from="median_z_score") %>%
+  column_to_rownames("trait_id") %>%
+  as.matrix
+```
+
+### Mean
+```{r heatmap_mean_z, fig.width=8, fig.height=6}
+pheatmap(mat_mean_z, scale="row")
+```
+
+### Median
+```{r heatmap_median_z, fig.width=8, fig.height=6}
+pheatmap(mat_median_z, scale="row")
+```
+
+# SCAVENGE TRS
+## Raw
+```{r summarize_trs_raw}
+df_trs_raw <- df_trait %>%
+  group_by(celltype, trait_id) %>%
+  summarise(mean_trs_raw=mean(trs_raw, na.rm=TRUE),
+            median_trs_raw=median(trs_raw, na.rm=TRUE),
+            .groups='drop')
+
+mat_mean_trs_raw <- df_trs_raw %>%
+  dplyr::select(celltype, trait_id, mean_trs_raw) %>%
+  pivot_wider(names_from="celltype", values_from="mean_trs_raw") %>%
+  column_to_rownames("trait_id") %>%
+  as.matrix
+
+mat_median_trs_raw <- df_trs_raw %>%
+  dplyr::select(celltype, trait_id, median_trs_raw) %>%
+  pivot_wider(names_from="celltype", values_from="median_trs_raw") %>%
+  column_to_rownames("trait_id") %>%
+  as.matrix
+```
+
+### Mean
+```{r heatmap_mean_trs_raw, fig.width=8, fig.height=6}
+pheatmap(mat_mean_trs_raw, scale="row")
+```
+
+### Median
+```{r heatmap_median_trs_raw, fig.width=8, fig.height=6}
+pheatmap(mat_median_trs_raw, scale="row")
+```
+
+
+## Scaled
+```{r summarize_trs_scaled}
+df_trs_scaled <- df_trait %>%
+  group_by(celltype, trait_id) %>%
+  summarise(mean_trs_scaled=mean(trs_scaled, na.rm=TRUE),
+            median_trs_scaled=median(trs_scaled, na.rm=TRUE),
+            .groups='drop')
+
+mat_mean_trs_scaled <- df_trs_scaled %>%
+  dplyr::select(celltype, trait_id, mean_trs_scaled) %>%
+  pivot_wider(names_from="celltype", values_from="mean_trs_scaled") %>%
+  column_to_rownames("trait_id") %>%
+  as.matrix
+
+mat_median_trs_scaled <- df_trs_scaled %>%
+  dplyr::select(celltype, trait_id, median_trs_scaled) %>%
+  pivot_wider(names_from="celltype", values_from="median_trs_scaled") %>%
+  column_to_rownames("trait_id") %>%
+  as.matrix
+```
+
+### Mean
+```{r heatmap_mean_trs_scaled, fig.width=8, fig.height=6}
+pheatmap(mat_mean_trs_scaled, scale="row")
+```
+
+### Median
+```{r heatmap_median_trs_scaled, fig.width=8, fig.height=6}
+pheatmap(mat_median_trs_scaled, scale="row")
+```
+
+
+# Significantly Enriched Cells
+```{r summarize_frac_enriched}
+df_enriched <- df_trait %>%
+  group_by(celltype, trait_id) %>%
+  summarise(frac_enriched=mean(is_enriched, na.rm=TRUE),
+            n_enriched=sum(is_enriched, na.rm=TRUE),
+            .groups='drop')
+
+mat_n_enriched <- df_enriched %>%
+  dplyr::select(celltype, trait_id, n_enriched) %>%
+  pivot_wider(names_from="celltype", values_from="n_enriched") %>%
+  column_to_rownames("trait_id") %>%
+  as.matrix
+
+mat_frac_enriched <- df_enriched %>%
+  dplyr::select(celltype, trait_id, frac_enriched) %>%
+  pivot_wider(names_from="celltype", values_from="frac_enriched") %>%
+  column_to_rownames("trait_id") %>%
+  as.matrix
+```
+
+### Count
+#### Raw
+```{r heatmap_n_enriched_raw, fig.width=8, fig.height=6}
+pheatmap(mat_n_enriched)
+```
+
+#### Scaled
+```{r heatmap_n_enriched_scale, fig.width=8, fig.height=6}
+pheatmap(mat_n_enriched, scale="column")
+```
+
+### Fraction
+#### Raw
+```{r heatmap_frac_enriched_raw, fig.width=8, fig.height=6}
+pheatmap(mat_frac_enriched)
+```
+
+#### Scaled
+```{r heatmap_frac_enriched_scaled_row, fig.width=8, fig.height=6}
+pheatmap(mat_frac_enriched, scale="row")
+```
+
+```{r heatmap_frac_enriched_scaled_column, fig.width=8, fig.height=6}
+pheatmap(mat_frac_enriched, scale="column")
+```
+
+---
+
+# Runtime Details
+## Snakemake Object
+<details>
+```{r print_snakemake, echo=FALSE}
+snakemake
+```
+</details>
+
+## Session Info
+<details>
+```{r sesh_info, echo=FALSE}
+sessionInfo()
+```
+</details>
+
+## Conda Environment
+<details>
+```{bash conda_info, comment="", echo=FALSE}
+if ! command -v conda &> /dev/null
+then
+  echo "Conda not detected."
+elif [ -z "${CONDA_PREFIX}" ]
+then
+  echo "No active Conda environment."
+else
+  echo "## Conda Environment YAML"
+  PREFIX=$(dirname $(dirname $(which R)))
+  conda env export -p $PREFIX
+fi
+```
+</details>

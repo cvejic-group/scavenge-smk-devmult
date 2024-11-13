@@ -1,0 +1,349 @@
+configfile: "config/config.yaml"
+
+import os
+from sys import stderr
+
+# print to stderr
+def message(*args, **kwargs):
+    print(*args, file=stderr, **kwargs)
+
+# ensure tmp directory exists
+os.makedirs(config['tmp_dir'], exist_ok=True)
+
+# load sample data
+message("[INFO] Checking trait set info...")
+trait_sets = config['trait_sets']
+for k, v in trait_sets.items():
+    message(f"[INFO]   Trait set '{k}' with {len(v['traits'])} traits.")
+
+wildcard_constraints:
+    n_background="[0-9]+",
+    n_neighbors="[0-9]+",
+    n_subsample="[0-9]+",
+    rseed="[0-9]+",
+    trait="[^_]+"
+
+################################################################################
+## MAIN
+################################################################################
+
+rule all:
+    input:
+        ## aggregated subsample table
+        expand("results/trs/df_trs_{trait_set}_knn{n_neighbors}_bg{n_background}_sample{n_subsample}_rng{rseed}.csv.gz",
+               trait_set="scavenge_yu_2022",
+               n_background=config['n_background'],
+               n_neighbors=config['n_neighbors'],
+               n_subsample=config['n_subsample_per_sample'],
+               rseed=config['seed_rng']),
+        ## individual subsample reports
+        expand("results/reports/trs/{trait_set}/report_trs_{trait}_knn{n_neighbors}_bg{n_background}_sample{n_subsample}_rng{rseed}.html",
+               trait_set="scavenge_yu_2022",
+               trait=trait_sets['scavenge_yu_2022']['traits'].keys(),
+               n_background=config['n_background'],
+               n_neighbors=config['n_neighbors'],
+               n_subsample=config['n_subsample_per_sample'],
+               rseed=config['seed_rng']),
+        ## combined subsample reports
+        expand("results/reports/trs/report_trs_{trait_set}_knn{n_neighbors}_bg{n_background}_sample{n_subsample}_rng{rseed}.html",
+               trait_set="scavenge_yu_2022",
+               n_background=config['n_background'],
+               n_neighbors=config['n_neighbors'],
+               n_subsample=config['n_subsample_per_sample'],
+               rseed=config['seed_rng']),
+        ## individual full reports
+        expand("results/reports/trs/{trait_set}/report_trs_{trait}_knn{n_neighbors}_bg{n_background}_rng{rseed}.html",
+               trait_set="scavenge_yu_2022",
+               trait=trait_sets['scavenge_yu_2022']['traits'].keys(),
+               n_background=config['n_background'],
+               n_neighbors=config['n_neighbors'],
+               rseed=config['seed_rng']),
+        ## aggregated full table
+        expand("results/trs/df_trs_{trait_set}_knn{n_neighbors}_bg{n_background}_rng{rseed}.csv.gz",
+               trait_set="scavenge_yu_2022",
+               n_background=config['n_background'],
+               n_neighbors=config['n_neighbors'],
+               rseed=config['seed_rng']),
+        ## combined full reports
+        expand("results/reports/trs/report_trs_{trait_set}_knn{n_neighbors}_bg{n_background}_rng{rseed}.html",
+               trait_set="scavenge_yu_2022",
+               n_background=config['n_background'],
+               n_neighbors=config['n_neighbors'],
+               rseed=config['seed_rng']),
+
+################################################################################
+## SUBSAMPLING
+################################################################################
+
+rule subsample_by_sample:
+    input:
+        h5=config['se_peak_cell']['h5'],
+        rds=config['se_peak_cell']['rds']
+    output:
+        rds="results/se/subsamples/se_sample{n_subsample}_rng{rseed}.Rds"
+    params:
+        key_subsample=config['key_sample'],
+        n_subsample=lambda wcs: wcs.n_subsample,
+        rseed=lambda wcs: wcs.rseed
+    threads: 48
+    conda: "envs/scavenge_r43.yaml"
+    script: "scripts/subsample_by_key.R"
+
+################################################################################
+## INTERMEDIATE OBJECTS
+################################################################################
+
+rule knn_subsample:
+    input:
+        se="results/se/subsamples/se_sample{n_subsample}_rng{rseed}.Rds"
+    output:
+        mat="results/knn/mat_knn{n_neighbors}_sample{n_subsample}_rng{rseed}.Rds"
+    params:
+        n_neighbors=lambda wcs: wcs.n_neighbors,
+        rseed=lambda wcs: wcs.rseed
+    threads: 4
+    conda: "envs/scavenge_r43.yaml"
+    script: "scripts/se_to_mknn_subsample.R"
+
+rule knn_full:
+    input:
+        h5=config['se_peak_cell']['h5'],
+        rds=config['se_peak_cell']['rds']
+    output:
+        mat="results/knn/mat_knn{n_neighbors}_rng{rseed}.Rds"
+    params:
+        n_neighbors=lambda wcs: wcs.n_neighbors,
+        rseed=lambda wcs: wcs.rseed
+    threads: 4
+    conda: "envs/scavenge_r43.yaml"
+    script: "scripts/se_to_mknn_full.R"
+
+rule bg_peaks_subsample:
+    input:
+        se="results/se/subsamples/se_sample{n_subsample}_rng{rseed}.Rds"
+    output:
+        mat="results/bg/mat_bg{n_background}_sample{n_subsample}_rng{rseed}.Rds"
+    params:
+        n_background=lambda wcs: wcs.n_background,
+        rseed=lambda wcs: wcs.rseed
+    threads: 4
+    conda: "envs/scavenge_r43.yaml"
+    script: "scripts/se_to_bg_subsample.R"
+
+rule bg_peaks_full:
+    input:
+        h5=config['se_peak_cell']['h5'],
+        rds=config['se_peak_cell']['rds']
+    output:
+        mat="results/bg/mat_bg{n_background}_rng{rseed}.Rds"
+    params:
+        n_background=lambda wcs: wcs.n_background,
+        rseed=lambda wcs: wcs.rseed
+    threads: 48
+    conda: "envs/scavenge_r43.yaml"
+    script: "scripts/se_to_bg_full.R"
+
+def get_trait_file(wildcards):
+    if not wildcards.trait_set in trait_sets.keys():
+        message(f"[Error] Trait set '{wildcards.trait_set}' not found!")
+        message("Available trait sets:", *trait_sets.keys(), sep="\n")
+        exit(1)
+    trait_set = trait_sets[wildcards.trait_set]
+    base_path = trait_set['base_path']
+
+    if not wildcards.trait in trait_set['traits'].keys():
+        message(f"[Error] Trait '{wildcards.trait}' not found in trait set '{wildcards.trait_set}'!")
+        message("Available traits:", *trait_set['traits'].keys(), sep="\n")
+        exit(1)
+    
+    file_name = trait_set['traits'][wildcards.trait]
+    
+    return f"{base_path}/{file_name}"
+
+rule deviations_trait_subsample:
+    input:
+        se="results/se/subsamples/se_sample{n_subsample}_rng{rseed}.Rds",
+        mat_bg="results/bg/mat_bg{n_background}_sample{n_subsample}_rng{rseed}.Rds",
+        bed_trait=get_trait_file
+    output:
+        dev_trait="results/dev/{trait_set}/dev_{trait}_bg{n_background}_sample{n_subsample}_rng{rseed}.Rds"
+    params:
+        rseed=lambda wcs: wcs.rseed
+    threads: 24
+    conda: "envs/scavenge_r43.yaml"
+    script: "scripts/compute_deviations_subsample.R"
+
+rule deviations_trait_full:
+    input:
+        h5=config['se_peak_cell']['h5'],
+        rds=config['se_peak_cell']['rds'],
+        mat_bg="results/bg/mat_bg{n_background}_rng{rseed}.Rds",
+        bed_trait=get_trait_file
+    output:
+        dev_trait="results/dev/{trait_set}/dev_{trait}_bg{n_background}_rng{rseed}.Rds"
+    params:
+        rseed=lambda wcs: wcs.rseed
+    threads: 64
+    conda: "envs/scavenge_r43.yaml"
+    script: "scripts/compute_deviations_full.R"
+
+rule trs_trait_subsample:
+    input:
+        mat_knn="results/knn/mat_knn{n_neighbors}_sample{n_subsample}_rng{rseed}.Rds",
+        dev_trait="results/dev/{trait_set}/dev_{trait}_bg{n_background}_sample{n_subsample}_rng{rseed}.Rds"
+    output:
+        csv_trait="results/trs/{trait_set}/df_trs_{trait}_knn{n_neighbors}_bg{n_background}_sample{n_subsample}_rng{rseed}.csv.gz"
+    params:
+        frac_seed_max=config['frac_seed_max'],
+        frac_scale_cut=config['frac_scale_cut'],
+        gamma_rw=config['gamma_rw'],
+        n_perms=config['n_perms'],
+        pvalue_sig_cell=config['pvalue_sig_cell'],
+        q_ceiling=config['q_ceiling'],
+        rseed=lambda wcs: wcs.rseed,
+        trait_set_id=lambda wcs: wcs.trait_set,
+        trait_id=lambda wcs: wcs.trait
+    threads: 12
+    conda: "envs/scavenge_r43.yaml"
+    script: "scripts/compute_trs.R"
+
+rule trs_trait_full:
+    input:
+        mat_knn="results/knn/mat_knn{n_neighbors}_rng{rseed}.Rds",
+        dev_trait="results/dev/{trait_set}/dev_{trait}_bg{n_background}_rng{rseed}.Rds"
+    output:
+        csv_trait="results/trs/{trait_set}/df_trs_{trait}_knn{n_neighbors}_bg{n_background}_rng{rseed}.csv.gz"
+    params:
+        frac_seed_max=config['frac_seed_max'],
+        frac_scale_cut=config['frac_scale_cut'],
+        gamma_rw=config['gamma_rw'],
+        n_perms=config['n_perms'],
+        pvalue_sig_cell=config['pvalue_sig_cell'],
+        q_ceiling=config['q_ceiling'],
+        rseed=lambda wcs: wcs.rseed,
+        trait_set_id=lambda wcs: wcs.trait_set,
+        trait_id=lambda wcs: wcs.trait
+    threads: 20
+    conda: "envs/scavenge_r43.yaml"
+    script: "scripts/compute_trs.R"
+
+################################################################################
+## AGGREGATE RESULTS
+################################################################################
+
+def get_trait_set_outputs_subsample(wildcards):
+    if not wildcards.trait_set in trait_sets.keys():
+        message(f"[Error] Trait set '{wildcards.trait_set}' not found!")
+        message("Available trait sets:", *trait_sets.keys(), sep="\n")
+        exit(1)
+    
+    return expand("results/trs/{trait_set}/df_trs_{trait}_knn{n_neighbors}_bg{n_background}_sample{n_subsample}_rng{rseed}.csv.gz",
+                  trait_set=wildcards.trait_set,
+                  trait=trait_sets[wildcards.trait_set]['traits'].keys(),
+                  n_neighbors=wildcards.n_neighbors,
+                  n_background=wildcards.n_background,
+                  n_subsample=wildcards.n_subsample,
+                  rseed=wildcards.rseed)
+
+rule aggregate_trait_set_subsample:
+    input:
+        get_trait_set_outputs_subsample
+    output:
+        "results/trs/df_trs_{trait_set}_knn{n_neighbors}_bg{n_background}_sample{n_subsample}_rng{rseed}.csv.gz"
+    threads: 1
+    shell: 
+        """
+        set +o pipefail
+        zcat {input[0]} | head -n 1 | gzip > {output}
+        for csv in {input}; do
+            zcat "$csv" | tail -n +2 | gzip >> {output}
+        done
+        """
+
+def get_trait_set_outputs_full(wildcards):
+    if not wildcards.trait_set in trait_sets.keys():
+        message(f"[Error] Trait set '{wildcards.trait_set}' not found!")
+        message("Available trait sets:", *trait_sets.keys(), sep="\n")
+        exit(1)
+    
+    return expand("results/trs/{trait_set}/df_trs_{trait}_knn{n_neighbors}_bg{n_background}_rng{rseed}.csv.gz",
+                  trait_set=wildcards.trait_set,
+                  trait=trait_sets[wildcards.trait_set]['traits'].keys(),
+                  n_neighbors=wildcards.n_neighbors,
+                  n_background=wildcards.n_background,
+                  rseed=wildcards.rseed)
+
+rule aggregate_trait_set_full:
+    input:
+        get_trait_set_outputs_full
+    output:
+        "results/trs/df_trs_{trait_set}_knn{n_neighbors}_bg{n_background}_rng{rseed}.csv.gz"
+    threads: 1
+    shell: 
+        """
+        set +o pipefail
+        zcat {input[0]} | head -n 1 | gzip > {output}
+        for csv in {input}; do
+            zcat "$csv" | tail -n +2 | gzip >> {output}
+        done
+        """
+
+################################################################################
+## REPORTS
+################################################################################
+
+rule report_trait_subsample:
+    input:
+        se="results/se/subsamples/se_sample{n_subsample}_rng{rseed}.Rds",
+        csv_trait="results/trs/{trait_set}/df_trs_{trait}_knn{n_neighbors}_bg{n_background}_sample{n_subsample}_rng{rseed}.csv.gz"
+    output: "results/reports/trs/{trait_set}/report_trs_{trait}_knn{n_neighbors}_bg{n_background}_sample{n_subsample}_rng{rseed}.html"
+    params:
+        n_subsample=lambda wcs: wcs.n_subsample,
+        rseed=lambda wcs: wcs.rseed,
+        trait_set_id=lambda wcs: wcs.trait_set,
+        trait_id=lambda wcs: wcs.trait
+    conda: "envs/scavenge_r43.yaml"
+    script:
+        "report/report_trait_subsample.Rmd"
+
+rule report_trait_full:
+    input:
+        h5=config['se_peak_cell']['h5'],
+        rds=config['se_peak_cell']['rds'],
+        csv_trait="results/trs/{trait_set}/df_trs_{trait}_knn{n_neighbors}_bg{n_background}_rng{rseed}.csv.gz"
+    output: "results/reports/trs/{trait_set}/report_trs_{trait}_knn{n_neighbors}_bg{n_background}_rng{rseed}.html"
+    params:
+        rseed=lambda wcs: wcs.rseed,
+        trait_set_id=lambda wcs: wcs.trait_set,
+        trait_id=lambda wcs: wcs.trait
+    conda: "envs/scavenge_r43.yaml"
+    resources:
+        mem_mb=24576
+    script:
+        "report/report_trait_full.Rmd"
+
+rule report_trait_set_subsample:
+    input:
+        se="results/se/subsamples/se_sample{n_subsample}_rng{rseed}.Rds",
+        csv_trait_set="results/trs/df_trs_{trait_set}_knn{n_neighbors}_bg{n_background}_sample{n_subsample}_rng{rseed}.csv.gz"
+    output: "results/reports/trs/report_trs_{trait_set}_knn{n_neighbors}_bg{n_background}_sample{n_subsample}_rng{rseed}.html"
+    params:
+        n_subsample=lambda wcs: wcs.n_subsample,
+        rseed=lambda wcs: wcs.rseed,
+        trait_set_id=lambda wcs: wcs.trait_set,
+    conda: "envs/scavenge_r43.yaml"
+    script:
+        "report/report_trait_set_subsample.Rmd"
+
+rule report_trait_set_full:
+    input:
+        h5=config['se_peak_cell']['h5'],
+        rds=config['se_peak_cell']['rds'],
+        csv_trait_set="results/trs/df_trs_{trait_set}_knn{n_neighbors}_bg{n_background}_rng{rseed}.csv.gz"
+    output: "results/reports/trs/report_trs_{trait_set}_knn{n_neighbors}_bg{n_background}_rng{rseed}.html"
+    params:
+        rseed=lambda wcs: wcs.rseed,
+        trait_set_id=lambda wcs: wcs.trait_set,
+    conda: "envs/scavenge_r43.yaml"
+    script:
+        "report/report_trait_set_full.Rmd"

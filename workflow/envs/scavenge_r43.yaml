@@ -1,0 +1,22 @@
+name: scavenge_r43
+channels:
+  - conda-forge
+  - bioconda
+  - nodefaults
+dependencies:
+  - r-base=4.3
+  - bioconductor-biocparallel=1.36
+  - bioconductor-bsgenome.hsapiens.ucsc.hg38
+  - bioconductor-chromvar=1.24
+  - bioconductor-delayedarray=0.28
+  - bioconductor-hdf5array=1.30
+  - bioconductor-summarizedexperiment=1.32
+  - r-buencolors=0.5.6
+  - r-data.table=1.15
+  - r-gchromvar=0.3.2
+  - r-igraph=2.0
+  - r-matrixstats=1.4
+  - r-pheatmap=1.0
+  - r-rmarkdown=2.28
+  - r-scavenge=1.0.2
+  - r-tidyverse=2.0
