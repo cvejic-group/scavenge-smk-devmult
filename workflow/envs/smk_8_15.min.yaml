@@ -1,0 +1,11 @@
+name: smk_8_15
+channels:
+  - conda-forge
+  - bioconda
+  - nodefaults
+dependencies:
+  - snakemake=8.15
+  - snakemake-interface-executor-plugins
+  - snakemake-executor-plugin-cluster-generic
+  - snakemake-executor-plugin-slurm
+prefix: /work/aaa/miniforge3/envs/smk_8_15
