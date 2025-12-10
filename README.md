@@ -7,6 +7,8 @@ that represents peak-cell counts.
 
 The pipeline uses the arguments in `config/config.yaml` to compute chromVAR deviations and 
 SCAVENGE TRS scores using peak-cell counts input as an `HDF5Array`-backed `SummarizedExperiment` object.
+We recommend SNP sets (`trait_sets`) be defined modularly in separate configuration YAMLs (e.g.,
+`config/config-gwas.yaml`).
 The pipeline includes both a **subsampling** mode and a **full** mode. The Snakefile `MAIN` section 
 defines what outputs will be generated.
 
@@ -35,7 +37,7 @@ conda env create -n smk_8_15 -f workflow/envs/smk_8_15.min.yaml
 The pipeline can be executed locally with
 
 ```bash
-snakemake --use-conda --cores 64 -s workflow/Snakefile
+snakemake --use-conda --cores 64 -s workflow/Snakefile --configfile config/config-gwas.yaml
 ```
 
 Adjust the `--cores` argument accordingly.
@@ -56,7 +58,7 @@ default-resources:
 which can be used with:
 
 ```bash
-snakemake --profile slurm_basic -s workflow/Snakefile
+snakemake --profile slurm_basic -s workflow/Snakefile --configfile config-gwas.yaml
 ```
 
 ### Generating Individual Outputs
@@ -65,7 +67,7 @@ For example, one could request a specific report on trait, like `covid19` with
 
 ```bash
 snakemake --profile slurm_basic \
-  -s workflow/Snakefile \
+  -s workflow/Snakefile --configfile config-gwas.yaml \
   results/reports/trs/scavenge_yu_2022/report_trs_covid19_knn30_bg200_sample300_rng20241104.html
 ```
 
