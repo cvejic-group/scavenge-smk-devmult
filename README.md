@@ -75,7 +75,7 @@ Note that the parameters in file name must match those in the `config.yaml` or b
 
 ```bash
 snakemake --profile slurm_basic \
-  -s workflow/Snakefile \
+  -s workflow/Snakefile --configfile config-gwas.yaml \
   --config seed_rng=20250101 \
   results/reports/trs/scavenge_yu_2022/report_trs_covid19_knn30_bg200_sample300_rng20250101.html
 ```
