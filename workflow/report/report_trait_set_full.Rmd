@@ -113,11 +113,13 @@ mat_median_z <- df_z %>%
 
 ### Mean
 ```{r heatmap_mean_z, fig.width=8, fig.height=6}
+pheatmap(mat_mean_z, scale="none")
 pheatmap(mat_mean_z, scale="row")
 ```
 
 ### Median
 ```{r heatmap_median_z, fig.width=8, fig.height=6}
+pheatmap(mat_median_z, scale="none")
 pheatmap(mat_median_z, scale="row")
 ```
 
@@ -145,11 +147,13 @@ mat_median_trs_raw <- df_trs_raw %>%
 
 ### Mean
 ```{r heatmap_mean_trs_raw, fig.width=8, fig.height=6}
+pheatmap(mat_mean_trs_raw, scale="none")
 pheatmap(mat_mean_trs_raw, scale="row")
 ```
 
 ### Median
 ```{r heatmap_median_trs_raw, fig.width=8, fig.height=6}
+pheatmap(mat_median_trs_raw, scale="none")
 pheatmap(mat_median_trs_raw, scale="row")
 ```
 
@@ -177,11 +181,13 @@ mat_median_trs_scaled <- df_trs_scaled %>%
 
 ### Mean
 ```{r heatmap_mean_trs_scaled, fig.width=8, fig.height=6}
+pheatmap(mat_mean_trs_scaled, scale="none")
 pheatmap(mat_mean_trs_scaled, scale="row")
 ```
 
 ### Median
 ```{r heatmap_median_trs_scaled, fig.width=8, fig.height=6}
+pheatmap(mat_median_trs_scaled, scale="none")
 pheatmap(mat_median_trs_scaled, scale="row")
 ```
 

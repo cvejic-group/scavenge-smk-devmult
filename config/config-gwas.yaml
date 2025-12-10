@@ -1,0 +1,42 @@
+## INPUTS
+
+# `trait_sets`
+# dictionary of trait sets
+# each set must contain:
+#   - `base_path` - path to find traits
+#   - `traits` - dictionary of {trait_name: trait_file} pairs.
+trait_sets:
+  scavenge_yu_2022:
+    base_path: "/work/DevM_analysis/06.phenotypes/data/gwas/SCAVENGE-reproducibility/data/finemappedtraits_hg19/hg38"
+    traits:
+      ## disease phenotypes
+      all: "ALL_FMdata.hg38.bed"
+      covid19: "covid19hg_B1_FMdata.hg38.bed"
+
+      ## blood phenotypes
+      baso: "baso.PP001.hg38.bed"
+      eo: "eo.PP001.hg38.bed"
+      hct: "hct.PP001.hg38.bed"
+      hgb: "hgb.PP001.hg38.bed"
+      hlr: "hlr.PP001.hg38.bed"
+      irf: "irf.PP001.hg38.bed"
+      lymph: "lymph.PP001.hg38.bed"
+      mch: "mch.PP001.hg38.bed"
+      mchc: "mchc.PP001.hg38.bed"
+      mcv: "mcv.PP001.hg38.bed"
+      mono: "mono.PP001.hg38.bed"
+      mpv: "mpv.PP001.hg38.bed"
+      mrv: "mrv.PP001.hg38.bed"
+      mscv: "mscv.PP001.hg38.bed"
+      neut: "neut.PP001.hg38.bed"
+      pct: "pct.PP001.hg38.bed"
+      pdw: "pdw.PP001.hg38.bed"
+      plt: "plt.PP001.hg38.bed"
+      rbc: "rbc.PP001.hg38.bed"
+      rdw: "rdw_cv.PP001.hg38.bed"
+      ret: "ret.PP001.hg38.bed"
+      wbc: "wbc.PP001.hg38.bed"
+  sle_khunsriraksakul_2023:
+    base_path: "/work/DevM_analysis/06.phenotypes/data/gwas/sle"
+    traits:
+      sle: "khunsriraksakul23-sle-hg38.bed"

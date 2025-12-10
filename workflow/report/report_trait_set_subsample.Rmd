@@ -17,11 +17,11 @@ if (interactive()) { ## fake data for testing
                                              params="list", threads="numeric"))
   snakemake <- Snakemake(
     input=list(se="results/se/subsamples/se_sample300_rng20241104.Rds",
-               csv_trait_set="results/trs/df_trs_scavenge_yu_2022_knn30_bg200_sample300_rng20241104.csv.gz"),
-    output=list("results/reports/trs/report_scavenge_yu_2022_knn30_bg200_sample300_rng20241104.html"),
+               csv_trait_set="results/trs/df_trs_chrombpnet_kupffer_knn30_bg200_sample300_rng20241104.csv.gz"),
+    output=list("results/reports/trs/report_chrombpnet_kupffer_knn30_bg200_sample300_rng20241104.html"),
     params=list(n_subsample="300",
                 rseed="20241104",
-                trait_set_id="scavenge_yu_2022"),
+                trait_set_id="chrombpnet_kupffer"),
     threads=4L)
 }
 
@@ -107,14 +107,31 @@ mat_median_z <- df_z %>%
   as.matrix
 ```
 
+```{r echo=FALSE}
+plt_height <- 2 + nrow(mat_mean_z)/6
+plt_width <- 1.5 + ncol(mat_mean_z)/6 + 0.07*max(str_width(rownames(mat_mean_z)))
+```
+
 ### Mean
-```{r heatmap_mean_z, fig.width=8, fig.height=6}
-pheatmap(mat_mean_z, scale="row")
+```{r heatmap_mean_z, fig.width=plt_width, fig.height=plt_height}
+pheatmap(mat_mean_z, scale="none", cutree_rows=6, cutree_cols=8)
+pheatmap(mat_mean_z, scale="row", cutree_rows=6, cutree_cols=8)
+```
+
+#### Similarity
+```{r heatmap_mean_z_sim, fig.width=plt_width, fig.height=plt_width}
+pheatmap(cor(mat_mean_z), scale="none", cutree_rows=8, cutree_cols=8, breaks=seq(-1,1,length.out=101))
 ```
 
 ### Median
-```{r heatmap_median_z, fig.width=8, fig.height=6}
-pheatmap(mat_median_z, scale="row")
+```{r heatmap_median_z, fig.width=plt_width, fig.height=plt_height}
+pheatmap(mat_median_z, scale="none", cutree_rows=6, cutree_cols=8)
+pheatmap(mat_median_z, scale="row", cutree_rows=6, cutree_cols=8)
+```
+
+#### Similarity
+```{r heatmap_median_z_sim, fig.width=plt_width, fig.height=plt_width}
+pheatmap(cor(mat_median_z), scale="none", cutree_rows=8, cutree_cols=8, breaks=seq(-1,1,length.out=101))
 ```
 
 # SCAVENGE TRS
@@ -140,13 +157,25 @@ mat_median_trs_raw <- df_trs_raw %>%
 ```
 
 ### Mean
-```{r heatmap_mean_trs_raw, fig.width=8, fig.height=6}
-pheatmap(mat_mean_trs_raw, scale="row")
+```{r heatmap_mean_trs_raw, fig.width=plt_width, fig.height=plt_height}
+pheatmap(mat_mean_trs_raw, scale="none", cutree_rows=6, cutree_cols=8)
+pheatmap(mat_mean_trs_raw, scale="row", cutree_rows=6, cutree_cols=8)
+```
+
+#### Similarity
+```{r heatmap_mean_trs_raw_sim, fig.width=plt_width, fig.height=plt_width}
+pheatmap(cor(mat_mean_trs_raw), scale="none", cutree_rows=8, cutree_cols=8, breaks=seq(-1,1,length.out=101))
 ```
 
 ### Median
-```{r heatmap_median_trs_raw, fig.width=8, fig.height=6}
-pheatmap(mat_median_trs_raw, scale="row")
+```{r heatmap_median_trs_raw, fig.width=plt_width, fig.height=plt_height}
+pheatmap(mat_median_trs_raw, scale="none", cutree_rows=6, cutree_cols=8)
+pheatmap(mat_median_trs_raw, scale="row", cutree_rows=6, cutree_cols=8)
+```
+
+#### Similarity
+```{r heatmap_median_trs_raw_sim, fig.width=plt_width, fig.height=plt_width}
+pheatmap(cor(mat_median_trs_raw), scale="none", cutree_rows=8, cutree_cols=8, breaks=seq(-1,1,length.out=101))
 ```
 
 
@@ -172,13 +201,25 @@ mat_median_trs_scaled <- df_trs_scaled %>%
 ```
 
 ### Mean
-```{r heatmap_mean_trs_scaled, fig.width=8, fig.height=6}
-pheatmap(mat_mean_trs_scaled, scale="row")
+```{r heatmap_mean_trs_scaled, fig.width=plt_width, fig.height=plt_height}
+pheatmap(mat_mean_trs_scaled, scale="none", cutree_rows=6, cutree_cols=8)
+pheatmap(mat_mean_trs_scaled, scale="row", cutree_rows=6, cutree_cols=8)
+```
+
+#### Similarity
+```{r heatmap_mean_trs_scaled_sim, fig.width=plt_width, fig.height=plt_width}
+pheatmap(cor(mat_mean_trs_scaled), scale="none", cutree_rows=8, cutree_cols=8, breaks=seq(-1,1,length.out=101))
 ```
 
 ### Median
-```{r heatmap_median_trs_scaled, fig.width=8, fig.height=6}
-pheatmap(mat_median_trs_scaled, scale="row")
+```{r heatmap_median_trs_scaled, fig.width=plt_width, fig.height=plt_height}
+pheatmap(mat_median_trs_scaled, scale="none", cutree_rows=6, cutree_cols=8)
+pheatmap(mat_median_trs_scaled, scale="row", cutree_rows=6, cutree_cols=8)
+```
+
+#### Similarity
+```{r heatmap_median_trs_scaled_sim, fig.width=plt_width, fig.height=plt_width}
+pheatmap(cor(mat_median_trs_scaled), scale="none", cutree_rows=8, cutree_cols=8, breaks=seq(-1,1,length.out=101))
 ```
 
 
@@ -205,29 +246,40 @@ mat_frac_enriched <- df_enriched %>%
 
 ### Count
 #### Raw
-```{r heatmap_n_enriched_raw, fig.width=8, fig.height=6}
-pheatmap(mat_n_enriched)
+```{r heatmap_n_enriched_raw, fig.width=plt_width, fig.height=plt_height}
+pheatmap(mat_n_enriched, cutree_rows=6, cutree_cols=8)
+```
+
+#### Similarity
+```{r heatmap_n_enriched_sim, fig.width=plt_width, fig.height=plt_width}
+pheatmap(cor(mat_n_enriched), scale="none", cutree_rows=8, cutree_cols=8, breaks=seq(-1,1,length.out=101))
 ```
 
 #### Scaled
-```{r heatmap_n_enriched_scale, fig.width=8, fig.height=6}
-pheatmap(mat_n_enriched, scale="column")
+```{r heatmap_n_enriched_scale, fig.width=plt_width, fig.height=plt_height}
+pheatmap(mat_n_enriched, scale="column", cutree_rows=6, cutree_cols=8)
 ```
 
 ### Fraction
 #### Raw
-```{r heatmap_frac_enriched_raw, fig.width=8, fig.height=6}
-pheatmap(mat_frac_enriched)
+```{r heatmap_frac_enriched_raw, fig.width=plt_width, fig.height=plt_height}
+pheatmap(mat_frac_enriched, cutree_rows=6, cutree_cols=8)
+```
+
+#### Similarity
+```{r heatmap_frac_enriched_sim, fig.width=plt_width, fig.height=plt_width}
+pheatmap(cor(mat_frac_enriched), scale="none", cutree_rows=8, cutree_cols=8, breaks=seq(-1,1,length.out=101))
 ```
 
 #### Scaled
-```{r heatmap_frac_enriched_scaled_row, fig.width=8, fig.height=6}
-pheatmap(mat_frac_enriched, scale="row")
+```{r heatmap_frac_enriched_scaled_row, fig.width=plt_width, fig.height=plt_height}
+pheatmap(mat_frac_enriched, scale="row", cutree_rows=6, cutree_cols=8)
 ```
 
-```{r heatmap_frac_enriched_scaled_column, fig.width=8, fig.height=6}
-pheatmap(mat_frac_enriched, scale="column")
+```{r heatmap_frac_enriched_scaled_column, fig.width=plt_width, fig.height=plt_height}
+pheatmap(mat_frac_enriched, scale="column", cutree_rows=6, cutree_cols=8)
 ```
+
 
 ---
 

@@ -26,50 +26,103 @@ wildcard_constraints:
 ################################################################################
 ## MAIN
 ################################################################################
+CUR_TRAIT_SET="scavenge_yu_2022"
+def get_all_subsample_reports():
+    tss = list()
+    for ts in trait_sets.keys():
+        if "chrombpnet" not in ts:
+            continue
+        ## aggregated subsample table
+        tss += expand("results/trs/df_trs_{trait_set}_knn{n_neighbors}_bg{n_background}_sample{n_subsample}_rng{rseed}.csv.gz",
+            trait_set=ts,
+            n_background=config['n_background'],
+            n_neighbors=config['n_neighbors'],
+            n_subsample=config['n_subsample_per_sample'],
+            rseed=config['seed_rng'])
+        ## individual subsample reports
+        tss += expand("results/reports/trs/{trait_set}/report_trs_{trait}_knn{n_neighbors}_bg{n_background}_sample{n_subsample}_rng{rseed}.html",
+            trait_set=ts,
+            trait=trait_sets[ts]['traits'].keys(),
+            n_background=config['n_background'],
+            n_neighbors=config['n_neighbors'],
+            n_subsample=config['n_subsample_per_sample'],
+            rseed=config['seed_rng'])
+        ## individual devtime subsample reports
+        tss += expand("results/reports/trs/{trait_set}/devtime/report_devtime_trs_{trait}_knn{n_neighbors}_bg{n_background}_sample{n_subsample}_rng{rseed}.html",
+        trait_set=ts,
+        trait=trait_sets[ts]['traits'].keys(),
+        n_background=config['n_background'],
+        n_neighbors=config['n_neighbors'],
+        n_subsample=config['n_subsample_per_sample'],
+        rseed=config['seed_rng'])
+        ## combined subsample reports
+        tss += expand("results/reports/trs/report_trs_{trait_set}_knn{n_neighbors}_bg{n_background}_sample{n_subsample}_rng{rseed}.html",
+            trait_set=ts,
+            n_background=config['n_background'],
+            n_neighbors=config['n_neighbors'],
+            n_subsample=config['n_subsample_per_sample'],
+            rseed=config['seed_rng'])
+    return tss
 
 rule all:
     input:
-        ## aggregated subsample table
-        expand("results/trs/df_trs_{trait_set}_knn{n_neighbors}_bg{n_background}_sample{n_subsample}_rng{rseed}.csv.gz",
-               trait_set="scavenge_yu_2022",
-               n_background=config['n_background'],
-               n_neighbors=config['n_neighbors'],
-               n_subsample=config['n_subsample_per_sample'],
-               rseed=config['seed_rng']),
-        ## individual subsample reports
-        expand("results/reports/trs/{trait_set}/report_trs_{trait}_knn{n_neighbors}_bg{n_background}_sample{n_subsample}_rng{rseed}.html",
-               trait_set="scavenge_yu_2022",
-               trait=trait_sets['scavenge_yu_2022']['traits'].keys(),
-               n_background=config['n_background'],
-               n_neighbors=config['n_neighbors'],
-               n_subsample=config['n_subsample_per_sample'],
-               rseed=config['seed_rng']),
-        ## combined subsample reports
-        expand("results/reports/trs/report_trs_{trait_set}_knn{n_neighbors}_bg{n_background}_sample{n_subsample}_rng{rseed}.html",
-               trait_set="scavenge_yu_2022",
-               n_background=config['n_background'],
-               n_neighbors=config['n_neighbors'],
-               n_subsample=config['n_subsample_per_sample'],
-               rseed=config['seed_rng']),
-        ## individual full reports
-        expand("results/reports/trs/{trait_set}/report_trs_{trait}_knn{n_neighbors}_bg{n_background}_rng{rseed}.html",
-               trait_set="scavenge_yu_2022",
-               trait=trait_sets['scavenge_yu_2022']['traits'].keys(),
-               n_background=config['n_background'],
-               n_neighbors=config['n_neighbors'],
-               rseed=config['seed_rng']),
-        ## aggregated full table
-        expand("results/trs/df_trs_{trait_set}_knn{n_neighbors}_bg{n_background}_rng{rseed}.csv.gz",
-               trait_set="scavenge_yu_2022",
-               n_background=config['n_background'],
-               n_neighbors=config['n_neighbors'],
-               rseed=config['seed_rng']),
-        ## combined full reports
-        expand("results/reports/trs/report_trs_{trait_set}_knn{n_neighbors}_bg{n_background}_rng{rseed}.html",
-               trait_set="scavenge_yu_2022",
-               n_background=config['n_background'],
-               n_neighbors=config['n_neighbors'],
-               rseed=config['seed_rng']),
+        get_all_subsample_reports()
+        # ## aggregated subsample table
+        # expand("results/trs/df_trs_{trait_set}_knn{n_neighbors}_bg{n_background}_sample{n_subsample}_rng{rseed}.csv.gz",
+        #        trait_set=CUR_TRAIT_SET,
+        #        n_background=config['n_background'],
+        #        n_neighbors=config['n_neighbors'],
+        #        n_subsample=config['n_subsample_per_sample'],
+        #        rseed=config['seed_rng']),
+        # ## individual subsample reports
+        # expand("results/reports/trs/{trait_set}/report_trs_{trait}_knn{n_neighbors}_bg{n_background}_sample{n_subsample}_rng{rseed}.html",
+        #        trait_set=CUR_TRAIT_SET,
+        #        trait=trait_sets[CUR_TRAIT_SET]['traits'].keys(),
+        #        n_background=config['n_background'],
+        #        n_neighbors=config['n_neighbors'],
+        #        n_subsample=config['n_subsample_per_sample'],
+        #        rseed=config['seed_rng']),
+        # ## individual devtime subsample reports
+        # expand("results/reports/trs/{trait_set}/devtime/report_devtime_trs_{trait}_knn{n_neighbors}_bg{n_background}_sample{n_subsample}_rng{rseed}.html",
+        #        trait_set=CUR_TRAIT_SET,
+        #        trait=trait_sets[CUR_TRAIT_SET]['traits'].keys(),
+        #        n_background=config['n_background'],
+        #        n_neighbors=config['n_neighbors'],
+        #        n_subsample=config['n_subsample_per_sample'],
+        #        rseed=config['seed_rng']),
+        # ## combined subsample reports
+        # expand("results/reports/trs/report_trs_{trait_set}_knn{n_neighbors}_bg{n_background}_sample{n_subsample}_rng{rseed}.html",
+        #        trait_set=CUR_TRAIT_SET,
+        #        n_background=config['n_background'],
+        #        n_neighbors=config['n_neighbors'],
+        #        n_subsample=config['n_subsample_per_sample'],
+        #        rseed=config['seed_rng']),
+        # ## individual full reports
+        # expand("results/reports/trs/{trait_set}/report_trs_{trait}_knn{n_neighbors}_bg{n_background}_rng{rseed}.html",
+        #        trait_set=CUR_TRAIT_SET,
+        #        trait=trait_sets[CUR_TRAIT_SET]['traits'].keys(),
+        #        n_background=config['n_background'],
+        #        n_neighbors=config['n_neighbors'],
+        #        rseed=config['seed_rng']),
+        # ## individual full devtime reports
+        # expand("results/reports/trs/{trait_set}/devtime/report_devtime_trs_{trait}_knn{n_neighbors}_bg{n_background}_rng{rseed}.html",
+        #        trait_set=CUR_TRAIT_SET,
+        #        trait=trait_sets[CUR_TRAIT_SET]['traits'].keys(),
+        #        n_background=config['n_background'],
+        #        n_neighbors=config['n_neighbors'],
+        #        rseed=config['seed_rng']),
+        # ## aggregated full table
+        # expand("results/trs/df_trs_{trait_set}_knn{n_neighbors}_bg{n_background}_rng{rseed}.csv.gz",
+        #        trait_set=CUR_TRAIT_SET,
+        #        n_background=config['n_background'],
+        #        n_neighbors=config['n_neighbors'],
+        #        rseed=config['seed_rng']),
+        # ## combined full reports
+        # expand("results/reports/trs/report_trs_{trait_set}_knn{n_neighbors}_bg{n_background}_rng{rseed}.html",
+        #        trait_set=CUR_TRAIT_SET,
+        #        n_background=config['n_background'],
+        #        n_neighbors=config['n_neighbors'],
+        #        rseed=config['seed_rng']),
 
 ################################################################################
 ## SUBSAMPLING
@@ -306,6 +359,21 @@ rule report_trait_subsample:
     script:
         "report/report_trait_subsample.Rmd"
 
+rule report_trait_subsample_devtime:
+    input:
+        se="results/se/subsamples/se_sample{n_subsample}_rng{rseed}.Rds",
+        csv_meta=config['sample_metadata'],
+        csv_trait="results/trs/{trait_set}/df_trs_{trait}_knn{n_neighbors}_bg{n_background}_sample{n_subsample}_rng{rseed}.csv.gz"
+    output: "results/reports/trs/{trait_set}/devtime/report_devtime_trs_{trait}_knn{n_neighbors}_bg{n_background}_sample{n_subsample}_rng{rseed}.html"
+    params:
+        n_subsample=lambda wcs: wcs.n_subsample,
+        rseed=lambda wcs: wcs.rseed,
+        trait_set_id=lambda wcs: wcs.trait_set,
+        trait_id=lambda wcs: wcs.trait
+    conda: "envs/scavenge_r43.yaml"
+    script:
+        "report/report_trait_subsample_devtime.Rmd"
+
 rule report_trait_full:
     input:
         h5=config['se_peak_cell']['h5'],
@@ -347,3 +415,18 @@ rule report_trait_set_full:
     conda: "envs/scavenge_r43.yaml"
     script:
         "report/report_trait_set_full.Rmd"
+
+rule report_trait_full_devtime:
+    input:
+        h5=config['se_peak_cell']['h5'],
+        rds=config['se_peak_cell']['rds'],
+        csv_meta=config['sample_metadata'],
+        csv_trait="results/trs/{trait_set}/df_trs_{trait}_knn{n_neighbors}_bg{n_background}_rng{rseed}.csv.gz"
+    output: "results/reports/trs/{trait_set}/devtime/report_devtime_trs_{trait}_knn{n_neighbors}_bg{n_background}_rng{rseed}.html"
+    params:
+        rseed=lambda wcs: wcs.rseed,
+        trait_set_id=lambda wcs: wcs.trait_set,
+        trait_id=lambda wcs: wcs.trait
+    conda: "envs/scavenge_r43.yaml"
+    script:
+        "report/report_trait_full_devtime.Rmd"

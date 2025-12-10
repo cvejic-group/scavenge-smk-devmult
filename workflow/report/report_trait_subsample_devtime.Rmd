@@ -1,0 +1,220 @@
+---
+author: "Mervin M Fansler"
+date: "`r format(Sys.time(), '%d %B %Y')`"
+output: 
+  html_document: 
+    code_folding: show
+    df_print: paged
+    theme: cosmo
+    toc: true
+    toc_float: true
+---
+
+
+```{r snakemake_object, include=FALSE, eval=FALSE}
+if (interactive()) { ## fake data for testing
+  Snakemake <- setClass("Snakemake", slots=c(input="list", output="list",
+                                             params="list", threads="numeric"))
+  snakemake <- Snakemake(
+    input=list(se="results/se/subsamples/se_sample300_rng20241104.Rds",
+               csv_trait="results/trs/scavenge_yu_2022/df_trs_covid19_knn30_bg200_sample300_rng20241104.csv.gz",
+               csv_meta="/work/DevM_analysis/utils/sam_info.DevM.22.10.24.csv"),
+    output=list("results/reports/trs/scavenge_yu_2022/df_trs_covid19_knn30_bg200_sample300_rng20241104.html"),
+    params=list(n_subsample="300",
+                rseed="20241104",
+                trait_set_id="scavenge_yu_2022",
+                trait_id="covid19"),
+    threads=4L)
+}
+
+print(snakemake)
+```
+
+
+```{r echo=FALSE}
+title_str <- sprintf("SCAVENGE %s - Subsampled, Developmental Time", snakemake@params$trait_id)
+```
+
+---
+title: `r title_str`
+---
+
+# Purpose
+
+Here we explore the SCAVENGE results for the trait **`r snakemake@params$trait_id`** in trait set 
+**`r snakemake@params$trait_set_id`** run on a random (seed: **`r snakemake@params$rseed`**) subset of 
+`r snakemake@params$n_subsample` cells per sample. This report focuses on changes across developmental
+time.
+
+# Initialization
+
+## Libraries
+```{r libs, message=FALSE, warning=FALSE}
+library(SummarizedExperiment)
+library(tidyverse)
+library(magrittr)
+```
+
+## Parameters
+```{r set_params}
+set.seed(snakemake@params$seed)
+
+theme_set(theme_bw())
+```
+
+# Data
+## Loading
+```{r load_data, message=FALSE}
+se_peak_cell <- readRDS(snakemake@input$se)
+
+df_trait <- read_csv(snakemake@input$csv_trait, show_col_types=FALSE)
+
+df_meta <- read_csv(snakemake@input$csv_meta, show_col_types=FALSE)
+```
+
+## Merge Data
+```{r merge_data}
+mat_umap <- metadata(se_peak_cell)$reducedDims$UMAP[df_trait$cell_id,] %>% `colnames<-`(c("UMAP1", "UMAP2"))
+mat_lsi <- metadata(se_peak_cell)$reducedDims$LSI[df_trait$cell_id,]
+
+df_trait <- colData(se_peak_cell[,df_trait$cell_id]) %>%
+  as_tibble(rownames="cell_id") %>%
+  left_join(df_meta, by="sampleID", suffix=c(".old","")) %>%
+  left_join(x=df_trait, by="cell_id") %>%
+  bind_cols(mat_umap) %>% bind_cols(mat_lsi) %>%
+  mutate(is_omitted=is.na(trs_raw))
+
+df_trait %<>% mutate(PCW=as.factor(as.integer(PCW)))
+
+df_sum <- df_trait %>%
+  group_by(PCW, celltype) %>%
+  summarize(n_cells=dplyr::n(),
+            n_omitted=sum(is_omitted),
+            n_seeds=sum(is_seed),
+            n_enriched=sum(is_enriched, na.rm=TRUE),
+            median_z_score=median(z_score, na.rm=TRUE),
+            mean_z_score=mean(z_score, na.rm=TRUE),
+            median_trs_raw=median(trs_raw, na.rm=TRUE),
+            mean_trs_scaled=mean(trs_scaled, na.rm=TRUE),
+            median_trs_scaled=median(trs_scaled, na.rm=TRUE),
+            q750_trs_scaled=quantile(trs_scaled, na.rm=TRUE, probs=0.750),
+            q250_trs_scaled=quantile(trs_scaled, na.rm=TRUE, probs=0.250),
+            sd_trs_scaled=sd(trs_scaled, na.rm=TRUE),
+            .groups='drop') %>%
+  mutate(frac_omitted=n_omitted/n_cells,
+         frac_seeds=n_seeds/n_cells,
+         frac_enriched=n_enriched/n_cells)
+```
+
+
+# Z-Score
+```{r plt_dots_zscore, fig.width=4.5, fig.height=6}
+df_sum %>%
+  filter(!is.na(PCW)) %>%
+  mutate(celltype_fct=reorder(celltype, -median_z_score, FUN=mean, na.rm=TRUE)) %>%
+  ggplot(aes(x=PCW, y=celltype_fct)) +
+  geom_point(aes(size=frac_enriched, fill=median_z_score, alpha=n_cells), color='black', pch=21) +
+  scale_fill_viridis_c(option="B") +
+  scale_alpha_continuous(range=c(0,1), transform='log1p', breaks=c(10, 30, 100, 300), 
+                         guide=guide_legend(override.aes=list(size=5, pch=16))) +
+  scale_size_continuous(range=c(1, 5)) +
+  labs(x="PCW", y=NULL, fill="Median\nZ-Score", size="Fraction\nEnriched", alpha="Cells Per\nSample") +
+  theme(axis.text.x=element_text(size=7), axis.text.y=element_text(size=8))
+```
+
+# TRS Raw
+```{r plt_dots_trs_raw, fig.width=4.5, fig.height=6}
+df_sum %>%
+  filter(!is.na(PCW)) %>%
+  mutate(celltype_fct=reorder(celltype, -median_trs_raw, FUN=mean)) %>%
+  ggplot(aes(x=PCW, y=celltype_fct)) +
+  geom_point(aes(size=frac_enriched, fill=median_trs_raw, alpha=n_cells), color='black', pch=21) +
+  scale_fill_viridis_c(option="B") +
+  scale_alpha_continuous(range=c(0,1), transform='log1p', breaks=c(10, 30, 100, 300), 
+                         guide=guide_legend(override.aes=list(size=5, pch=16))) +
+  scale_size_continuous(range=c(1, 5)) +
+  labs(x="PCW", y=NULL, fill="Median TRS\n(raw)", size="Fraction\nEnriched", alpha="Cells Per\nSample") +
+  theme(axis.text.x=element_text(size=7), axis.text.y=element_text(size=8))
+```
+
+
+# TRS Scaled
+## Bubble Plot
+```{r plt_dots_trs_scaled, fig.width=4.5, fig.height=6}
+df_sum %>%
+  filter(!is.na(PCW)) %>%
+  mutate(celltype_fct=reorder(celltype, -median_trs_scaled, FUN=mean)) %>%
+  ggplot(aes(x=PCW, y=celltype_fct)) +
+  geom_point(aes(size=frac_enriched, fill=median_trs_scaled, alpha=n_cells), color='black', pch=21) +
+  scale_fill_viridis_c(option="B") +
+  scale_alpha_continuous(range=c(0,1), transform='log1p', breaks=c(10, 30, 100, 300), 
+                         guide=guide_legend(override.aes=list(size=5, pch=16))) +
+  scale_size_continuous(range=c(1, 5)) +
+  labs(x="PCW", y=NULL, fill="Median TRS\n(scaled)", size="Fraction\nEnriched", alpha="Cells Per\nSample") +
+  theme(axis.text.x=element_text(size=7), axis.text.y=element_text(size=8))
+```
+
+## Line Plots
+### Percentiles
+```{r plt_line_percentiles, fig.width=12, fig.height=12, warning=FALSE}
+df_sum %>%
+  filter(!is.na(PCW)) %>%
+  mutate(celltype_fct=reorder(celltype, -median_trs_scaled, FUN=median)) %>%
+  ggplot(aes(x=as.integer(as.character(PCW)))) +
+  geom_ribbon(aes(ymin=q250_trs_scaled, ymax=q750_trs_scaled), alpha=0.3) +
+  geom_line(aes(y=median_trs_scaled)) +
+  scale_x_continuous(breaks=seq(5,18)) +
+  scale_y_continuous(expand=c(0,0,0.1,0), limits=c(0,NA)) +
+  facet_wrap(facets=vars(celltype_fct), ncol=3) + 
+  labs(x="PCW", y="TRS Percentiles (25%|50%|75%)")
+```
+
+
+### Expected Mean
+```{r plt_line_mean_trs, fig.width=12, fig.height=12, warning=FALSE, message=FALSE}
+df_trait %>%
+  filter(!is.na(PCW)) %>%
+  mutate(celltype_fct=reorder(celltype, -trs_scaled, FUN=median, na.rm=TRUE)) %>%
+  ggplot(aes(x=as.integer(as.character(PCW)))) +
+  geom_smooth(aes(y=trs_scaled), method="loess") +
+  scale_x_continuous(breaks=seq(5,18)) +
+  scale_y_continuous(expand=c(0,0,0.1,0), limits=c(0,NA)) +
+  facet_wrap(facets=vars(celltype_fct), ncol=3) + 
+  labs(x="PCW", y="Mean TRS (Scaled)")
+```
+
+
+
+---
+
+# Runtime Details
+## Snakemake Object
+<details>
+```{r print_snakemake, echo=FALSE}
+snakemake
+```
+</details>
+
+## Session Info
+<details>
+```{r sesh_info, echo=FALSE}
+sessionInfo()
+```
+</details>
+
+## Conda Environment
+<details>
+```{bash conda_info, comment="", echo=FALSE}
+if ! command -v conda &> /dev/null
+then
+  echo "Conda not detected."
+elif [ -z "${CONDA_PREFIX}" ]
+then
+  echo "No active Conda environment."
+else
+  echo "## Conda Environment YAML"
+  PREFIX=$(dirname $(dirname $(which R)))
+  conda env export -p $PREFIX
+fi
+```
+</details>
