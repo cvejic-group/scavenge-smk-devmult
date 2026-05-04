@@ -1,3 +1,5 @@
+[![DOI](https://zenodo.org/badge/887752273.svg)](https://doi.org/10.5281/zenodo.20024541)
+
 # scavenge-smk
 This is a Snakemake pipeline for running SCAVENGE on large scATAC-seq datasets.
 Specifically, the pipeline is written for an `SummarizedExperiment` object
