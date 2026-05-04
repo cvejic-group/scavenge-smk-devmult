@@ -1,4 +1,4 @@
-[![DOI](https://zenodo.org/badge/887752273.svg)](https://doi.org/10.5281/zenodo.20024541)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.20024542.svg)](https://doi.org/10.5281/zenodo.20024542)
 
 # scavenge-smk
 This is a Snakemake pipeline for running SCAVENGE on large scATAC-seq datasets.
