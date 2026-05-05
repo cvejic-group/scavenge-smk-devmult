@@ -2,7 +2,7 @@
 
 # scavenge-smk
 This is a Snakemake pipeline for running SCAVENGE on large scATAC-seq datasets.
-Specifically, the pipeline is written for an `SummarizedExperiment` object
+Specifically, the pipeline is written for a `SummarizedExperiment` object
 that represents peak-cell counts.
 
 ## Overview
@@ -33,6 +33,8 @@ More details available in [`config/config.yaml`](config/config.yaml).
 ### Inputs
 - `se_peak_cell` - a peak-cell count `SummarizedExperiment` object
 - BED files for fine-mapped traits - hg38 liftOver outputs from https://github.com/drewmard/t21_multiome
+
+**NB:** We provide a script to convert an ArchR object to an HDF5-backed `SummarizedExperiment` in [the **cvejic-group/hFL-hematopoiesis** repository](https://github.com/cvejic-group/hFL-hematopoiesis/blob/main/annotation/04.scavenge/preprocess/01-export-archr-to-se-3.Rmd).
 
 ### Outputs
 - `results/trs/` - CSV tables per trait and per trait set with chromVAR and SCAVENGE scores
