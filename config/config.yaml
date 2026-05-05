@@ -43,7 +43,7 @@ n_neighbors: 30
 # integer [1, ...)
 # SCAVENGE parameter
 # defines number of permutations to use in estimating null distribution of network propagation scores
-# SCAVENGE and Marderstein, 2024 use 30
+# SCAVENGE and Marderstein, 2024 use 1000
 n_perms: 1000
 
 # `n_subsample_per_sample`
